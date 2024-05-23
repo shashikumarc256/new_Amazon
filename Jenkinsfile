@@ -6,8 +6,9 @@ pipeline {
     }
 
     environment {
-        ARTIFACTORY_SERVER = 'jfrog-artifactory-instance' // Artifactory server ID configured in Jenkins
-        ARTIFACTORY_REPO = 'artifactory-build-info'               // Target repository in Artifactory
+        ARTIFACTORY_SERVER_ID = 'jfrog-artifactory-instance'
+        ARTIFACTORY_REPO = 'artifactory-build-info'
+        ARTIFACTORY_CREDENTIALS_ID = 'jfrog-artifactory-instance'
     }
 
     stages {
@@ -23,25 +24,40 @@ pipeline {
             }
         }
 
-        stage('jfrog') {
+        stage('Upload to Artifactory') {
             steps {
                 script {
-                    // Define the Artifactory server
-                    def server = Artifactory.server(ARTIFACTORY_SERVER)
-                    
-                    // Define the upload spec
+                    def server = Artifactory.server(ARTIFACTORY_SERVER_ID)
+
                     def uploadSpec = """{
                         "files": [{
                             "pattern": "target/*.jar",
                             "target": "${ARTIFACTORY_REPO}/"
                         }]
                     }"""
-                    
-                    // Upload artifacts to Artifactory
+
                     server.upload(uploadSpec)
+                }
+            }
+        }
+
+        stage('Publish Build Info') {
+            steps {
+                script {
+                    def server = Artifactory.server(ARTIFACTORY_SERVER_ID)
+
+                    def buildInfo = Artifactory.newBuildInfo()
+                    buildInfo.env.capture = true
+                    
+                    server.publishBuildInfo(buildInfo)
                 }
             }
         }
     }
 
+    post {
+        always {
+            echo 'Pipeline completed.'
+        }
+    }
 }
